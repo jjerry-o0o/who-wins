@@ -1,6 +1,6 @@
 # WhoWins? — 프로젝트 계획서
 
-보드게임 전용 점수판 웹앱. 진행자가 게임을 생성하고 참여자들이 비밀번호로 입장해 실시간으로 점수를 확인하는 모바일 우선 서비스.
+보드게임 전용 점수판 웹앱. **한 명이 혼자 사용하는 단일 사용자 앱** — 게임 생성 시 플레이어 이름을 직접 입력하고, 라운드별 점수를 기록하며 최종 순위를 확인한다.
 
 ---
 
@@ -11,6 +11,7 @@
 - **GitHub**: https://github.com/jjerry-o0o/who-wins.git
 - **Git 계정**: jjerry-o0o / alfndp25@gmail.com (로컬 설정, 글로벌 아님)
 - **Supabase 프로젝트 URL**: https://alllfvivqrmgzkeuktxn.supabase.co
+- **배포**: Vercel (GitHub master 브랜치 push 시 자동 배포)
 - **환경변수**: `.env.local` (gitignore 처리됨, 직접 입력 필요)
 
 ### 환경변수 (.env.local)
@@ -35,9 +36,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase Settings → API → anon public key>
 |------|------|------|
 | 프레임워크 | Next.js (v16.2.9, App Router) | create-next-app으로 초기화 |
 | 스타일링 | Tailwind CSS v4 | `@tailwindcss/postcss` 방식 (Vite 아님) |
-| 백엔드/DB | Supabase (Auth + PostgreSQL + Realtime) | |
+| 백엔드/DB | Supabase (PostgreSQL) | Auth 미사용, anon 키로 직접 접근 |
 | 언어 | TypeScript | |
-| 배포 | Vercel | Phase 6 진행 중 |
+| 배포 | Vercel | master push → 자동 배포 |
 
 ---
 
@@ -52,61 +53,41 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase Settings → API → anon public key>
 
 ---
 
-## 사용자 역할
+## 앱 흐름
 
-### 진행자 (Host)
-- Supabase Auth 이메일 로그인 필요
-- 새 게임 생성, 참여자 입장 확인, 라운드 점수 입력, 라운드 추가/종료
-
-### 참여자 (Participant)
-- 6자리 비밀번호만으로 입장 (게임 코드 없음)
-- 닉네임 설정 후 players 테이블에 등록
-- 세션은 localStorage에 저장 (`player_session` 키)
-- 실시간 순위판 및 라운드 기록 조회 가능
+1. 랜딩 (`/`) → "새 게임 만들기" 또는 "게임 기록 보기"
+2. 게임 생성 (`/dashboard/new`) → 게임명 + 플레이어 이름 입력 (2~8명)
+3. 게임 화면 (`/game/[id]`) → 라운드 1부터 점수 입력 시작
+4. 라운드 완료 후 → "라운드 추가" 또는 "게임 종료" 선택
+5. 결과 화면 (`/game/[id]/result`) → 최종 순위 + 라운드 기록
 
 ---
 
-## 게임 흐름
-
-1. 진행자 게임 생성 → 비밀번호 서버 생성 (6자리, 활성 게임 중복 체크)
-2. 진행자 닉네임 설정 (players 테이블에 host로 등록)
-3. 비밀번호 공유 → 참여자 입장 (`/join`)
-4. "참여자 확인" 버튼으로 입장 인원 확인 → max_players 충족 시 "라운드 시작" 활성화
-5. 라운드 점수 입력 → 완료 후 "라운드 추가" 또는 "게임 종료" 선택
-6. 결과 페이지 (`/game/[id]/result`)
-
----
-
-## Supabase 스키마 (실제 DB 상태)
-
-> `supabase/schema.sql` 파일 참고. 이후 ALTER TABLE로 변경된 내용 반영됨.
+## Supabase 스키마 (현재 DB 상태)
 
 ```sql
 games (
   id uuid PK,
-  host_id uuid FK → auth.users,
   name text,
-  password text,             -- 6자리 참여 비밀번호 (서버 생성, 평문)
   status text,               -- 'waiting' | 'playing' | 'finished'
-  total_rounds int,          -- 현재 미사용 (동적 라운드로 변경됨)
-  max_players int,           -- 최대 참여 인원
+  total_rounds int,          -- 미사용 (동적 라운드)
   started_at timestamptz,
   finished_at timestamptz,
   created_at timestamptz
 )
--- 주의: code 컬럼은 DROP됨, password_hash → password로 RENAME됨
+-- 제거됨: host_id, password, max_players
 
 players (
   id uuid PK,
   game_id uuid FK → games,
   nickname text,
-  user_id uuid nullable FK → auth.users,  -- 진행자는 값 있음, 참여자는 null
   created_at timestamptz
 )
+-- 제거됨: user_id
 
 rounds (
   id uuid PK,
-  game_id uuid FK → games,
+  game_id uuid FK → rounds,
   round_number int,
   created_at timestamptz
 )
@@ -119,7 +100,7 @@ scores (
 )
 ```
 
-> **Realtime 활성화 필요**: Supabase → Database → Replication에서 games, players, rounds, scores 체크
+**RLS 정책**: 모든 테이블 `FOR ALL USING (true) WITH CHECK (true)` (anon 전체 허용)
 
 ---
 
@@ -128,36 +109,27 @@ scores (
 ```
 src/
   app/
-    page.tsx                      # 랜딩 페이지
+    page.tsx                      # 랜딩 페이지 (새 게임 / 기록 보기)
     layout.tsx                    # 루트 레이아웃
     globals.css
-    auth/
-      login/page.tsx              # 진행자 로그인/회원가입 (탭 전환)
-      reset/page.tsx              # 비밀번호 재설정 이메일 발송
-      update-password/page.tsx    # 새 비밀번호 입력
-      callback/route.ts           # Supabase Auth 콜백
-    join/
-      page.tsx                    # 참여자 입장 (비밀번호 → 닉네임)
     dashboard/
-      page.tsx                    # 진행자 홈 (게임 목록)
-      new/page.tsx                # 게임 생성 폼
+      page.tsx                    # 게임 목록
+      new/page.tsx                # 게임 생성 (게임명 + 플레이어 이름 입력)
     game/[id]/
       page.tsx                    # 게임 메인 (Server Component)
-      GameBoard.tsx               # 게임 보드 (Client, Realtime)
+      GameBoard.tsx               # 게임 보드 (Client Component)
       ScoreInput.tsx              # 라운드 점수 입력
       result/page.tsx             # 최종 결과 화면
     actions/
-      game.ts                     # createGame, joinGameAsHost
+      game.ts                     # createGame (게임 + 플레이어 동시 생성)
       round.ts                    # submitRoundScores, endGame
   lib/
     supabase/
       client.ts                   # 브라우저용 Supabase 클라이언트
       server.ts                   # 서버용 Supabase 클라이언트
       types.ts                    # DB 타입 정의
-    utils.ts                      # generatePassword (6자리 코드 생성)
-  proxy.ts                        # /dashboard 보호 미들웨어 (Next.js 16: middleware.ts → proxy.ts)
-supabase/
-  schema.sql                      # DB 스키마 전체 (초기 버전)
+    utils.ts                      # generateGameCode (미사용)
+  proxy.ts                        # /dashboard 미들웨어 (Next.js 16: middleware.ts → proxy.ts), 현재는 pass-through만
 next.config.ts                    # NODE_TLS_REJECT_UNAUTHORIZED=0 (dev only, Windows SSL 우회)
 ```
 
@@ -171,6 +143,8 @@ next.config.ts                    # NODE_TLS_REJECT_UNAUTHORIZED=0 (dev only, Wi
 | SSL SELF_SIGNED_CERT_IN_CHAIN | Windows 개발 환경 Node.js SSL 이슈 | next.config.ts에서 dev 모드에만 NODE_TLS_REJECT_UNAUTHORIZED=0 |
 | dashboard?error=create | DB 컬럼명 불일치 (password_hash vs password) | ALTER TABLE games RENAME COLUMN password_hash TO password |
 | 회원가입 중복 이메일 오류 없음 | Supabase signUp 200 반환 + session:null | data.session null 체크로 분기 처리 |
+| 새 게임 생성 시 404 | proxy.ts 미들웨어가 /dashboard 진입 시 /auth/login으로 리다이렉트, 해당 페이지 삭제됨 | proxy.ts를 pass-through로 변경 |
+| cannot drop column host_id | host_id에 의존하는 RLS 정책이 존재 | 의존 정책 먼저 DROP 후 컬럼 제거 |
 
 ---
 
@@ -181,35 +155,26 @@ next.config.ts                    # NODE_TLS_REJECT_UNAUTHORIZED=0 (dev only, Wi
 - [x] Supabase 클라이언트 라이브러리 설치 및 환경변수 설정
 - [x] Supabase 스키마 SQL 작성 및 실행
 
-### Phase 2 — 인증 & 입장 ✅
+### Phase 2 — 인증 & 입장 ✅ (이후 제거됨)
 - [x] Supabase 클라이언트 유틸 (client.ts, server.ts, types.ts)
 - [x] 인증 미들웨어 (proxy.ts)
-- [x] 랜딩 페이지 (/)
-- [x] 진행자 로그인/회원가입 (/auth/login)
-- [x] 비밀번호 재설정 (/auth/reset, /auth/update-password)
-- [x] 참여자 입장 화면 (/join) — 비밀번호 + 닉네임
+- [x] 랜딩 페이지, 로그인/회원가입, 비밀번호 재설정, 참여자 입장 화면
 
 ### Phase 3 — 게임 생성 ✅
-- [x] 진행자 대시보드 (/dashboard)
-- [x] 게임 생성 폼 (이름, 플레이어 수)
-- [x] 비밀번호 서버 생성 + 중복 체크 (Server Action)
+- [x] 진행자 대시보드, 게임 생성 폼
 
 ### Phase 4 — 게임 진행 ✅
-- [x] 게임 메인 화면 (/game/[id])
-- [x] 진행자 닉네임 설정 (players 테이블 등록)
-- [x] 참여자 확인 버튼 → 라운드 시작 활성화
-- [x] 라운드 점수 입력 (진행자만)
-- [x] 라운드 추가 / 게임 종료 선택
-- [x] Supabase Realtime 구독 (점수 실시간 갱신)
-- [x] 참여자 대기 중 화면
+- [x] 게임 메인 화면, 라운드 점수 입력, 라운드 추가/종료, Supabase Realtime
 
 ### Phase 5 — 결과 화면 ✅
-- [x] 최종 결과 페이지 (/game/[id]/result)
-- [x] 1위 트로피 하이라이트
-- [x] 전체 순위 (메달 표시)
-- [x] 라운드별 점수 기록 테이블
+- [x] 최종 결과 페이지, 순위, 라운드 기록
 
-### Phase 6 — 배포 ← 현재 단계
-- [ ] Vercel 배포 (환경변수 설정)
-- [ ] Supabase Auth URL 설정 (Site URL, Redirect URLs → Vercel URL)
-- [ ] RLS 정책 확인 (참여자 anon INSERT 허용 여부)
+### Phase 6 — 단일 사용자 앱으로 전환 + 배포 ✅
+- [x] 인증(로그인/회원가입) 전면 제거
+- [x] 게임 생성 시 플레이어 이름 직접 입력으로 변경 (2~8명)
+- [x] 참여 코드/비밀번호 시스템 제거
+- [x] Realtime 구독 제거 (단일 사용자이므로 불필요)
+- [x] 동점자 순위 처리 (1,1,3 방식, 동점 1위 다수 표시)
+- [x] Supabase DB 스키마 변경 (host_id, password, max_players, user_id 제거)
+- [x] RLS 정책 anon 전체 허용으로 변경
+- [x] Vercel 배포 (GitHub master push → 자동 배포)
