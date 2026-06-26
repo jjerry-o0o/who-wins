@@ -34,19 +34,6 @@ export default function NewGamePage() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-gray-400 text-sm font-medium">총 라운드 수</label>
-            <input
-              type="number"
-              name="totalRounds"
-              min={1}
-              max={20}
-              defaultValue={5}
-              required
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-violet-500"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
             <label className="text-gray-400 text-sm font-medium">플레이어 수</label>
             <input
               type="number"

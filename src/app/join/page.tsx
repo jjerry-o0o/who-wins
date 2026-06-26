@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 
 export default function JoinPage() {
   const router = useRouter()
-  const [gameCode, setGameCode] = useState('')
   const [password, setPassword] = useState('')
   const [nickname, setNickname] = useState('')
   const [step, setStep] = useState<'enter' | 'nickname'>('enter')
@@ -23,24 +22,13 @@ export default function JoinPage() {
 
     const { data: game, error: gameError } = await supabase
       .from('games')
-      .select('id, name, password, status')
-      .eq('code', gameCode.toUpperCase())
+      .select('id, status')
+      .eq('password', password.toUpperCase())
+      .neq('status', 'finished')
       .single()
 
     if (gameError || !game) {
-      setError('게임을 찾을 수 없습니다. 코드를 확인해주세요.')
-      setLoading(false)
-      return
-    }
-
-    if (game.password !== password) {
-      setError('비밀번호가 올바르지 않습니다.')
-      setLoading(false)
-      return
-    }
-
-    if (game.status === 'finished') {
-      setError('이미 종료된 게임입니다.')
+      setError('비밀번호가 올바르지 않거나 종료된 게임입니다.')
       setLoading(false)
       return
     }
@@ -95,20 +83,12 @@ export default function JoinPage() {
           <form onSubmit={handleJoin} className="flex flex-col gap-4">
             <input
               type="text"
-              placeholder="게임 코드 (예: AB12CD)"
-              value={gameCode}
-              onChange={(e) => setGameCode(e.target.value)}
+              placeholder="참여 비밀번호 (예: AB3K7P)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               maxLength={6}
               required
               className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-violet-500 uppercase tracking-widest text-center text-lg font-bold"
-            />
-            <input
-              type="password"
-              placeholder="게임 비밀번호"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-violet-500"
             />
 
             {error && (

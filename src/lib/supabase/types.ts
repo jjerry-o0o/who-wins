@@ -35,6 +35,10 @@ export interface Score {
   score: number
 }
 
+export interface RoundWithScores extends Round {
+  scores: Score[]
+}
+
 export interface Comment {
   id: string
   game_id: string
@@ -48,4 +52,11 @@ export interface PlayerSession {
   playerId: string
   nickname: string
   isHost: boolean
+}
+
+export interface PlayerStanding {
+  id: string
+  nickname: string
+  totalScore: number
+  rank: number
 }
