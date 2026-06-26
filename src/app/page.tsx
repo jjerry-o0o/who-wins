@@ -15,23 +15,18 @@ export default function LandingPage() {
 
         <div className="w-full flex flex-col gap-3">
           <Link
-            href="/auth/login"
+            href="/dashboard/new"
             className="w-full py-4 bg-violet-600 active:bg-violet-700 text-white font-bold text-lg rounded-2xl text-center"
           >
-            진행자로 시작
+            새 게임 만들기
           </Link>
           <Link
-            href="/join"
+            href="/dashboard"
             className="w-full py-4 bg-gray-800 active:bg-gray-700 text-white font-bold text-lg rounded-2xl text-center border border-gray-700"
           >
-            참여자로 입장
+            게임 기록 보기
           </Link>
         </div>
-
-        <p className="text-gray-600 text-xs text-center leading-relaxed">
-          진행자: 게임 생성 및 점수 입력<br />
-          참여자: 비밀번호로 입장 후 점수 확인
-        </p>
 
       </div>
     </main>

@@ -1,14 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Player } from '@/lib/supabase/types'
+import { Player, RoundWithScores } from '@/lib/supabase/types'
 import { submitRoundScores } from '@/app/actions/round'
 
 interface Props {
   gameId: string
   players: Player[]
   currentRound: number
-  onSuccess: () => void
+  onSuccess: (round: RoundWithScores) => void
 }
 
 export default function ScoreInput({ gameId, players, currentRound, onSuccess }: Props) {
@@ -45,7 +45,7 @@ export default function ScoreInput({ gameId, players, currentRound, onSuccess }:
       return
     }
 
-    onSuccess()
+    onSuccess(result.round!)
     setLoading(false)
   }
 

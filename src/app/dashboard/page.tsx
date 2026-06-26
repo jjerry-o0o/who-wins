@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Game } from '@/lib/supabase/types'
 
@@ -18,20 +17,15 @@ const statusColor: Record<string, string> = {
 export default async function DashboardPage() {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/auth/login')
-
   const { data: games } = await supabase
     .from('games')
     .select('*')
-    .eq('host_id', user.id)
     .order('created_at', { ascending: false })
 
   return (
     <main className="min-h-screen bg-gray-950 p-6">
       <div className="w-full max-w-sm mx-auto flex flex-col gap-6">
 
-        {/* 헤더 */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-black text-white">
             Who<span className="text-violet-400">Wins</span>?
@@ -44,7 +38,6 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {/* 게임 목록 */}
         {!games || games.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
             <div className="text-5xl">🎲</div>
@@ -62,7 +55,7 @@ export default async function DashboardPage() {
                 <div className="flex flex-col gap-1">
                   <span className="text-white font-bold">{game.name}</span>
                   <span className="text-gray-500 text-xs">
-                    {game.total_rounds}라운드 · {game.max_players}명
+                    {game.total_rounds}라운드
                   </span>
                 </div>
                 <span className={`text-xs font-bold px-2 py-1 rounded-lg ${statusColor[game.status]}`}>

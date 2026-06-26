@@ -10,8 +10,6 @@ export default async function GamePage({
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
   const { data: game } = await supabase
     .from('games')
     .select('*')
@@ -33,16 +31,11 @@ export default async function GamePage({
     .eq('game_id', id)
     .order('round_number')
 
-  const isHost = user?.id === game.host_id
-  const isHostJoined = players?.some(p => p.user_id === user?.id) ?? false
-
   return (
     <GameBoard
       game={game}
       players={players ?? []}
       rounds={rounds ?? []}
-      isHost={isHost}
-      isHostJoined={isHostJoined}
     />
   )
 }

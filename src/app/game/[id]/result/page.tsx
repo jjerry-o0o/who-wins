@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Player, RoundWithScores, PlayerStanding } from '@/lib/supabase/types'
 
 function calculateStandings(players: Player[], rounds: RoundWithScores[]): PlayerStanding[] {
-  return players
+  const sorted = players
     .map(player => ({
       id: player.id,
       nickname: player.nickname,
@@ -15,7 +15,15 @@ function calculateStandings(players: Player[], rounds: RoundWithScores[]): Playe
       rank: 0,
     }))
     .sort((a, b) => b.totalScore - a.totalScore)
-    .map((player, index) => ({ ...player, rank: index + 1 }))
+
+  return sorted.reduce<PlayerStanding[]>((acc, player, index) => {
+    const rank = index === 0
+      ? 1
+      : player.totalScore === acc[index - 1].totalScore
+        ? acc[index - 1].rank
+        : index + 1
+    return [...acc, { ...player, rank }]
+  }, [])
 }
 
 const RANK_STYLE = [
@@ -31,8 +39,6 @@ export default async function ResultPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
 
   const { data: game } = await supabase
     .from('games')
@@ -57,33 +63,31 @@ export default async function ResultPage({
 
   const typedRounds = (rounds ?? []) as RoundWithScores[]
   const standings = calculateStandings(players ?? [], typedRounds)
-  const isHost = user?.id === game.host_id
 
   return (
     <main className="min-h-screen bg-gray-950 p-4">
       <div className="w-full max-w-sm mx-auto flex flex-col gap-6 py-4">
 
-        {/* 헤더 */}
         <div className="text-center flex flex-col gap-1">
           <p className="text-gray-500 text-sm">게임 종료</p>
           <h1 className="text-2xl font-black text-white">{game.name}</h1>
           <p className="text-gray-600 text-xs">{rounds?.length ?? 0}라운드 진행</p>
         </div>
 
-        {/* 1위 하이라이트 */}
         {standings[0] && (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-6 text-center flex flex-col gap-2">
             <p className="text-4xl">🏆</p>
-            <p className="text-amber-400 font-black text-2xl">{standings[0].nickname}</p>
+            {standings.filter(p => p.rank === 1).map(p => (
+              <p key={p.id} className="text-amber-400 font-black text-2xl">{p.nickname}</p>
+            ))}
             <p className="text-amber-300/60 text-sm">{standings[0].totalScore}점</p>
           </div>
         )}
 
-        {/* 전체 순위 */}
         <div className="flex flex-col gap-2">
           <h2 className="text-gray-400 text-sm font-medium">최종 순위</h2>
-          {standings.map((player, index) => {
-            const style = RANK_STYLE[index] ?? { emoji: `${player.rank}`, color: 'text-gray-600', bg: 'bg-gray-900 border-gray-800' }
+          {standings.map((player) => {
+            const style = RANK_STYLE[player.rank - 1] ?? { emoji: `${player.rank}`, color: 'text-gray-600', bg: 'bg-gray-900 border-gray-800' }
             return (
               <div
                 key={player.id}
@@ -91,7 +95,7 @@ export default async function ResultPage({
               >
                 <div className="flex items-center gap-3">
                   <span className="text-lg w-6 text-center">{style.emoji}</span>
-                  <span className={`font-medium ${index < 3 ? 'text-white' : 'text-gray-300'}`}>
+                  <span className={`font-medium ${player.rank <= 3 ? 'text-white' : 'text-gray-300'}`}>
                     {player.nickname}
                   </span>
                 </div>
@@ -103,7 +107,6 @@ export default async function ResultPage({
           })}
         </div>
 
-        {/* 라운드 기록 */}
         {typedRounds.length > 0 && players && (
           <div className="flex flex-col gap-2">
             <h2 className="text-gray-400 text-sm font-medium">라운드 기록</h2>
@@ -138,21 +141,18 @@ export default async function ResultPage({
           </div>
         )}
 
-        {/* 하단 버튼 */}
         <div className="flex flex-col gap-3 pb-4">
-          {isHost && (
-            <Link
-              href="/dashboard/new"
-              className="w-full py-4 bg-violet-600 active:bg-violet-700 text-white font-bold text-lg rounded-2xl text-center"
-            >
-              새 게임 만들기
-            </Link>
-          )}
           <Link
-            href={isHost ? '/dashboard' : '/join'}
+            href="/dashboard/new"
+            className="w-full py-4 bg-violet-600 active:bg-violet-700 text-white font-bold text-lg rounded-2xl text-center"
+          >
+            새 게임 만들기
+          </Link>
+          <Link
+            href="/dashboard"
             className="w-full py-4 bg-gray-800 active:bg-gray-700 text-gray-300 font-bold text-lg rounded-2xl text-center border border-gray-700"
           >
-            {isHost ? '대시보드로' : '홈으로'}
+            대시보드로
           </Link>
         </div>
 
