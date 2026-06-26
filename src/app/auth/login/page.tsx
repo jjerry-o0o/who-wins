@@ -27,11 +27,17 @@ export default function LoginPage() {
         router.push('/dashboard')
       }
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) {
-        setError('회원가입에 실패했습니다. 다시 시도해주세요.')
-      } else {
+        if (error.message.includes('password') || error.message.includes('Password')) {
+          setError('비밀번호는 6자 이상이어야 합니다.')
+        } else {
+          setError(error.message)
+        }
+      } else if (data.session) {
         router.push('/dashboard')
+      } else {
+        setError('이미 사용 중인 이메일이거나 이메일 인증이 필요합니다.')
       }
     }
 
@@ -79,10 +85,11 @@ export default function LoginPage() {
           />
           <input
             type="password"
-            placeholder="비밀번호"
+            placeholder="비밀번호 (6자 이상)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            minLength={6}
             className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-white placeholder-gray-600 focus:outline-none focus:border-violet-500"
           />
 
@@ -97,6 +104,16 @@ export default function LoginPage() {
           >
             {loading ? '처리 중...' : mode === 'login' ? '로그인' : '회원가입'}
           </button>
+
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => router.push('/auth/reset')}
+              className="text-gray-500 text-sm text-center"
+            >
+              비밀번호를 잊으셨나요?
+            </button>
+          )}
         </form>
 
       </div>
