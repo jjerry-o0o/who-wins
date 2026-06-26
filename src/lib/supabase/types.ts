@@ -7,6 +7,7 @@ export interface Game {
   password: string
   status: GameStatus
   total_rounds: number
+  max_players: number
   started_at: string | null
   finished_at: string | null
   created_at: string
